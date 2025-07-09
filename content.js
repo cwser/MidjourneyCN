@@ -5,6 +5,7 @@
     let config = { enabled: true, lang: 'zh-Hans' };
     let dictHans = {};
     let dictHant = {};
+    const CACHE_DURATION = 6 * 60 * 60 * 1000; // 6 hours
 
     // --- 核心功能函数 (已适配 Chrome Extension API) ---
     async function loadDictionary(forceReload = false) {
@@ -12,7 +13,7 @@
         const storedCache = await chrome.storage.local.get(cacheKey);
         const cache = storedCache[cacheKey] || {};
         const now = Date.now();
-        if (!forceReload && cache.timestamp && now - cache.timestamp < 6 * 60 * 60 * 1000) {
+        if (!forceReload && cache.timestamp && now - cache.timestamp < CACHE_DURATION) {
             dictHans = cache.dictHans || {};
             dictHant = cache.dictHant || {};
             console.log("Midjourney-Translate: Dictionary loaded from cache.");
@@ -32,14 +33,41 @@
         }
     }
     function getDict() { return config.lang === 'zh-Hant' ? dictHant : dictHans; }
-    function translateText(text) { const dict = getDict(); const cleaned = text.trim(); return dict[cleaned] || text; }
+
+    function normalizeKey(text) {
+        return text
+            .replace(/[\t\n\r]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/[:\uFF1A]$/, '')
+            .trim();
+    }
+
+    function translateText(text) {
+        const dict = getDict();
+        const cleaned = text.trim();
+        const normalized = normalizeKey(cleaned);
+        const lower = normalized.toLowerCase();
+        return (
+            dict[cleaned] ||
+            dict[normalized] ||
+            dict[lower] ||
+            text
+        );
+    }
     function processNode(node) {
         if (!config.enabled || !node || !document.body.contains(node)) return;
+        if (node.nodeType === 1 && ['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(node.tagName)) return;
         const translateAttributes = (el) => {
             const dict = getDict();
-            ['title', 'aria-label', 'alt', 'placeholder'].forEach(attr => {
+            ['title', 'aria-label', 'alt', 'placeholder', 'value'].forEach(attr => {
                 const val = el.getAttribute(attr);
-                if (val && dict[val.trim()]) { el.setAttribute(attr, dict[val.trim()]); el.dataset.translatedAttr = 'true'; }
+                if (val) {
+                    const translated = translateText(val);
+                    if (translated && translated !== val) {
+                        el.setAttribute(attr, translated);
+                        el.dataset.translatedAttr = 'true';
+                    }
+                }
             });
         };
         if (node.nodeType === 3) { const translated = translateText(node.textContent); if (translated && translated !== node.textContent) { node.textContent = translated; } }
@@ -59,8 +87,20 @@
         });
     });
     function initObserver() {
-        if (!document.body) { window.addEventListener('DOMContentLoaded', () => { observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['title', 'aria-label', 'alt', 'placeholder'] }); }); }
-        else { observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['title', 'aria-label', 'alt', 'placeholder'] }); }
+        const options = {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ['title', 'aria-label', 'alt', 'placeholder', 'value']
+        };
+        if (!document.body) {
+            window.addEventListener('DOMContentLoaded', () => {
+                observer.observe(document.body, options);
+            });
+        } else {
+            observer.observe(document.body, options);
+        }
     }
 
 
@@ -241,5 +281,4 @@
     }
 
     main().catch(console.error);
-
 })();
