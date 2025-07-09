@@ -1,0 +1,40 @@
+{
+"update_url": "https://clients2.google.com/service/update2/crx",
+
+  "manifest_version": 3,
+  "name": "MidJourney 中文增强插件",
+  "description": "将 MidJourney 网站英文界面翻译为中文，支持简繁切换、缓存优化与动态监听。",
+  "version": "1.0.1",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.midjourney.com/*",
+    "https://raw.githubusercontent.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.midjourney.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "MidJourney 翻译",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
