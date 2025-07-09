@@ -1,1 +1,1 @@
-# midjourneyCN
+# MidjourneyCN
